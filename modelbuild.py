@@ -3,6 +3,7 @@ import sklearn.preprocessing
 import sklearn.naive_bayes
 import numpy as np
 import scipy.stats as ss
+import matplotlib.pyplot as plt
 import math
 
 # read data
@@ -33,6 +34,27 @@ df_cv = df.iloc[cv_indices].reset_index(drop = True)
 df_test = df.iloc[test_indices].reset_index(drop = True)
 
 
+# tracking accuracy stats
+accuracies = []
+accuracies_w = []
+accuracies_nw = []
+
+falsepos = []
+falsepos_w = []
+falsepos_nw = []
+
+falseneg = []
+falseneg_w = []
+falseneg_nw = []
+
+# tracking selection stats
+selection_w = []
+selection_nw = []
+overall_selection = []
+s_ratios = []
+
+# first we want to fit a simple Naive Bayes classifier using race
+
 basic_model = sklearn.naive_bayes.CategoricalNB().fit(X = df_train.drop(['HEFAMINC'], axis = 1).values,
                                                  y = df_train['HEFAMINC'].values)
 
@@ -40,67 +62,105 @@ test_results = basic_model.predict(df_test.drop(['HEFAMINC'], axis = 1).values)
 test_set_performance = np.mean(test_results == df_test['HEFAMINC'])
 df_test['predictions'] = test_results
 
-print(test_set_performance)
+accuracies.append(test_set_performance)
 
-# looking at accuracy by race
+
+df_test['accuracy'] = df_test['predictions'] == df_test['HEFAMINC']
 df_test['falsepos'] = (df_test['predictions'] == '1.0') & (df_test['HEFAMINC']== '0.0')
 df_test['falseneg'] = (df_test['predictions'] == '0.0')& (df_test['HEFAMINC'] == '1.0')
-df_test['accuracy'] = df_test['predictions'] == df_test['HEFAMINC']
 
+falsepos_tot = np.mean(df_test['falsepos'].astype(float))
+falsepos.append(falsepos_tot)
+falseneg_tot = np.mean(df_test['falseneg'].astype(float))
+falseneg.append(falseneg_tot)
+
+# looking at accuracy by race
 accuracy_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['accuracy'].astype(float))
+accuracies_w.append(accuracy_white)
 accuracy_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['accuracy'].astype(float))
+accuracies_nw.append(accuracy_nonwhite)
 
 falsepos_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falsepos'].astype(float))
+falsepos_w.append(falsepos_white)
 falsepos_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falsepos'].astype(float))
+falsepos_nw.append(falsepos_nonwhite)
 
 falseneg_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falseneg'].astype(float))
+falseneg_w.append(falseneg_white)
 falseneg_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falseneg'].astype(float))
+falseneg_nw.append(falseneg_nonwhite)
 
-print(accuracy_white)
-print(accuracy_nonwhite)
-print(falsepos_white)
-print(falsepos_nonwhite)
-print(falseneg_white)
-print(falseneg_nonwhite)
 
 # check selection rates
 cv_results = basic_model.predict(df_cv.drop(['HEFAMINC'], axis = 1).values)
 df_cv['predictions'] = cv_results
+selection_tot = np.mean(df_cv['predictions'].astype(float))
+overall_selection.append(selection_tot)
 selection_white = np.mean(df_cv.loc[df_cv['race-binary'] == '1.0']['predictions'].astype(float))
+selection_w.append(selection_white)
 selection_oth = np.mean(df_cv.loc[df_cv['race-binary'] == '0.0']['predictions'].astype(float))
+selection_nw.append(selection_oth)
 
 selection_ratio = selection_white/selection_oth
-print(selection_ratio)
+
+s_ratios.append(selection_ratio)
 
 
-# now we want to iterate
+# now we want to iterate, dropping variables correlated with race
 
-accuracies = []
-s_ratios = []
 selection_ratio = 0
 vars_to_drop = ['HEFAMINC', 'race-binary']
 
-while selection_ratio < 4/5:
+#while selection_ratio < 4/5:
+while len(vars_to_drop) < df_cv.shape[1]-1:
     debiased_model = sklearn.naive_bayes.CategoricalNB().fit(X = df_train.drop(vars_to_drop, axis = 1).values,
                                                              y = df_train['HEFAMINC'].values)
 
-    test_results = debiased_model.predict(df_test.drop(vars_to_drop + ['predictions'], axis = 1).values)
+    test_results = debiased_model.predict(df_test.drop(vars_to_drop + ['predictions', 'accuracy', 'falsepos', 'falseneg'], axis = 1).values)
     test_set_performance = np.mean(test_results == df_test['HEFAMINC'])
     df_test['predictions'] = test_results
     accuracies.append(test_set_performance)
 
-    # check selection rates
+    df_test['accuracy'] = df_test['predictions'] == df_test['HEFAMINC']
+    df_test['falsepos'] = (df_test['predictions'] == '1.0') & (df_test['HEFAMINC']== '0.0')
+    df_test['falseneg'] = (df_test['predictions'] == '0.0')& (df_test['HEFAMINC'] == '1.0')
 
+    falsepos_tot = np.mean(df_test['falsepos'].astype(float))
+    falsepos.append(falsepos_tot)
+    falseneg_tot = np.mean(df_test['falseneg'].astype(float))
+    falseneg.append(falseneg_tot)
+
+    # looking at accuracy by race
+    accuracy_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['accuracy'].astype(float))
+    accuracies_w.append(accuracy_white)
+    accuracy_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['accuracy'].astype(float))
+    accuracies_nw.append(accuracy_nonwhite)
+
+    falsepos_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falsepos'].astype(float))
+    falsepos_w.append(falsepos_white)
+    falsepos_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falsepos'].astype(float))
+    falsepos_nw.append(falsepos_nonwhite)
+
+    falseneg_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falseneg'].astype(float))
+    falseneg_w.append(falseneg_white)
+    falseneg_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falseneg'].astype(float))
+    falseneg_nw.append(falseneg_nonwhite)
+
+    # check selection rates
     cv_results = debiased_model.predict(df_cv.drop(vars_to_drop + ['predictions'], axis = 1).values)
     df_cv['predictions'] = cv_results
+    selection_tot = np.mean(df_cv['predictions'].astype(float))
+    overall_selection.append(selection_tot)
     selection_white = np.mean(df_cv.loc[df_cv['race-binary'] == '1.0']['predictions'].astype(float))
+    selection_w.append(selection_white)
     selection_oth = np.mean(df_cv.loc[df_cv['race-binary'] == '0.0']['predictions'].astype(float))
-
+    selection_nw.append(selection_oth)
 
     selection_ratio = selection_white/selection_oth
     s_ratios.append(selection_ratio)
 
-    if selection_ratio < 4/5:
+    #if selection_ratio < 4/5:
+    if len(vars_to_drop) < df_cv.shape[1]-1:
 
         names = []
         v_coefs = []
@@ -119,26 +179,53 @@ while selection_ratio < 4/5:
 
         print ('Dropping ' + corr_df.iloc[0,0])
 
-# looking at accuracy by race
-df_test['falsepos'] = (df_test['predictions'] == '1.0') & (df_test['HEFAMINC']== '0.0')
-df_test['falseneg'] = (df_test['predictions'] == '0.0')& (df_test['HEFAMINC'] == '1.0')
-df_test['accuracy'] = df_test['predictions'] == df_test['HEFAMINC']
 
-accuracy_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['accuracy'].astype(float))
-accuracy_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['accuracy'].astype(float))
+# let's plot some results
+xlist = range(0, df_cv.shape[1]-2)
 
-falsepos_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falsepos'].astype(float))
-falsepos_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falsepos'].astype(float))
+# plotting selection rates
+overall = plt.plot(xlist, overall_selection, 'k:', label = 'Overall')
+white = plt.plot(xlist, selection_w, 'b', label = 'White')
+nonwhite = plt.plot(xlist, selection_nw, 'g', label = 'Nonwhite')
+plt.axvline(x=6, color='r')
+plt.legend(loc="upper right")
+plt.ylabel('Selection Rate')
+plt.xlabel('# of Variables Dropped')
+plt.show()
+plt.close()
 
-falseneg_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falseneg'].astype(float))
-falseneg_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falseneg'].astype(float))
+#plotting accuracy
+overall = plt.plot(xlist, accuracies, 'k:', label = 'Overall')
+white = plt.plot(xlist, accuracies_w, 'b', label = 'White')
+nonwhite = plt.plot(xlist, accuracies_nw, 'g', label = 'Nonwhite')
+plt.axvline(x=6, color='r')
+plt.legend(loc="upper right")
+plt.ylabel('Accuracy')
+plt.xlabel('# of Variables Dropped')
+plt.show()
+plt.close()
 
-print(accuracy_white)
-print(accuracy_nonwhite)
-print(falsepos_white)
-print(falsepos_nonwhite)
-print(falseneg_white)
-print(falseneg_nonwhite)
+# plotting false positives
+overall = plt.plot(xlist, falsepos, 'k:', label = 'Overall')
+white = plt.plot(xlist, falsepos_w, 'b', label = 'White')
+nonwhite = plt.plot(xlist, falsepos_nw, 'g', label = 'Nonwhite')
+plt.axvline(x=6, color='r')
+plt.legend(loc="upper right")
+plt.ylabel('False Positive Rate')
+plt.xlabel('# of Variables Dropped')
+plt.show()
+plt.close()
+
+# plotting false negatives
+overall = plt.plot(xlist, falseneg, 'k:', label = 'Overall')
+white = plt.plot(xlist, falseneg_w, 'b', label = 'White')
+nonwhite = plt.plot(xlist, falseneg_nw, 'g', label = 'Nonwhite')
+plt.axvline(x=6, color='r')
+plt.legend(loc="upper right")
+plt.ylabel('False Negative Rate')
+plt.xlabel('# of Variables Dropped')
+plt.show()
+plt.close()
 
 
 # helper function to define Cramer's V
