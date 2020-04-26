@@ -38,12 +38,32 @@ basic_model = sklearn.naive_bayes.CategoricalNB().fit(X = df_train.drop(['HEFAMI
 
 test_results = basic_model.predict(df_test.drop(['HEFAMINC'], axis = 1).values)
 test_set_performance = np.mean(test_results == df_test['HEFAMINC'])
+df_test['predictions'] = test_results
 
 print(test_set_performance)
 
-# check selection rates
-df_test['predictions'] = test_results
+# looking at accuracy by race
+df_test['falsepos'] = (df_test['predictions'] == '1.0') & (df_test['HEFAMINC']== '0.0')
+df_test['falseneg'] = (df_test['predictions'] == '0.0')& (df_test['HEFAMINC'] == '1.0')
+df_test['accuracy'] = df_test['predictions'] == df_test['HEFAMINC']
 
+accuracy_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['accuracy'].astype(float))
+accuracy_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['accuracy'].astype(float))
+
+falsepos_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falsepos'].astype(float))
+falsepos_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falsepos'].astype(float))
+
+falseneg_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falseneg'].astype(float))
+falseneg_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falseneg'].astype(float))
+
+print(accuracy_white)
+print(accuracy_nonwhite)
+print(falsepos_white)
+print(falsepos_nonwhite)
+print(falseneg_white)
+print(falseneg_nonwhite)
+
+# check selection rates
 cv_results = basic_model.predict(df_cv.drop(['HEFAMINC'], axis = 1).values)
 df_cv['predictions'] = cv_results
 selection_white = np.mean(df_cv.loc[df_cv['race-binary'] == '1.0']['predictions'].astype(float))
@@ -100,6 +120,26 @@ while selection_ratio < 4/5:
         print ('Dropping ' + corr_df.iloc[0,0])
 
 # looking at accuracy by race
+df_test['falsepos'] = (df_test['predictions'] == '1.0') & (df_test['HEFAMINC']== '0.0')
+df_test['falseneg'] = (df_test['predictions'] == '0.0')& (df_test['HEFAMINC'] == '1.0')
+df_test['accuracy'] = df_test['predictions'] == df_test['HEFAMINC']
+
+accuracy_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['accuracy'].astype(float))
+accuracy_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['accuracy'].astype(float))
+
+falsepos_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falsepos'].astype(float))
+falsepos_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falsepos'].astype(float))
+
+falseneg_white = np.mean(df_test.loc[df_test['race-binary'] == '1.0']['falseneg'].astype(float))
+falseneg_nonwhite = np.mean(df_test.loc[df_test['race-binary'] == '0.0']['falseneg'].astype(float))
+
+print(accuracy_white)
+print(accuracy_nonwhite)
+print(falsepos_white)
+print(falsepos_nonwhite)
+print(falseneg_white)
+print(falseneg_nonwhite)
+
 
 # helper function to define Cramer's V
 def cramers_v(x, y):
