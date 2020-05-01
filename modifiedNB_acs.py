@@ -110,7 +110,7 @@ def run_kfold(fields, labels):
         print("accuracy rate: ", acc)
     return best
 
-training_w, testing_w = run_kfold(df_white, income_w)
+#training_w, testing_w = run_kfold(df_white, income_w)
 
 
 # And now for nonwhite people
@@ -122,7 +122,7 @@ print(df_nwhite.head())
 enc = sklearn.preprocessing.OrdinalEncoder()
 enc.fit(df_nwhite)
 df_nwhite = pd.DataFrame(enc.transform(df_nwhite), index = None, columns = headers, dtype = str)
-training_n, testing_n = run_kfold(df_nwhite, income_n)
+#training_n, testing_n = run_kfold(df_nwhite, income_n)
 
 
 # ## Accuracy
@@ -407,6 +407,150 @@ print("accuracy: %4f" % (accuracy_overall/total))
 
 # In[ ]:
 
+# write testing and training indeces to files for both white and nonwhite 
+
+with open("test.csv", "w") as fo_test, open("train.csv", "w") as fo_train:
+    writer_test = csv.writer(fo_test)
+    writer_train = csv.writer(fo_train)
+    headers = df_nwhite.columns.tolist()
+    headers.append("race")
+    headers.append("income")
+    writer_test.writerow(headers)
+    writer_test.writerow(headers)
+    for i in range(len(race_indeces)):
+        if len(race_indeces[i]) > 0:
+            fields = df_nwhite.iloc[race_indeces[i]].reset_index(drop = True)
+            training, testing = run_kfold(fields, race_labels[i])
+            training = training.tolist()
+            testing = testing.tolist()
+            for index in testing:
+                writer_test.writerow(fields.iloc[index].tolist() + [i] + [race_labels[i][index]])
+            for index in training:
+                writer_train.writerow(fields.iloc[index].tolist() + [i] + [race_labels[i][index]])
+    training, testing = run_kfold(df_white, income_w)
+    training = training.tolist()
+    testing = testing.tolist()
+    for index in testing:
+        writer_test.writerow(df_white.iloc[index].tolist() + [1] + [income_w[index]])
+    for index in training:
+        writer_train.writerow(df_white.iloc[index].tolist() + [1] + [income_w[index]])
 
 
+# In[]:
+import csv
+import pandas as pd 
 
+with open("test.csv", "r") as fi:
+    reader = csv.reader(fi)
+    headers = next(reader)
+    next(reader)
+    headers.append("group")
+    lines = []
+    
+    for line in reader:
+        lines.append(line + ["test"])
+        
+
+
+# In[]:
+
+with open("train.csv", "r") as fi:
+    reader = csv.reader(fi)
+    h = next(reader)
+    
+    for line in reader:
+        lines.append(line + ["train"])
+        
+data = pd.DataFrame(lines, columns=headers)
+print(data.head(15))
+
+
+# In[]:
+print(data.columns)
+
+# In[]:
+
+# results for nnb
+from sklearn.naive_bayes import CategoricalNB
+import numpy as np
+
+ 
+results = ["-1"] * data.shape[0]
+for race in data['race'].unique():
+    train = data[(data['race'] == race) & (data['group'] == 'train')]
+    test = data[(data['race'] == race) & (data['group'] == 'test')]
+
+    clf = CategoricalNB()
+    clf.fit(train.drop(columns=['race', 'income', 'group']), train['income'])
+    
+    res = clf.predict(test.drop(columns=['race', 'income', 'group'])).tolist()
+    
+    res_index = 0
+    test_indeces = np.where((data['race'] == race) & (data['group'] == 'test'))[0].tolist()
+    for test_index in test_indeces:
+        results[test_index] = res[res_index]
+        res_index += 1
+        
+data['nnb_res'] = results
+print(results[0:15])
+
+# In[]:
+
+# 2NB 
+
+results = ["-1"]*data.shape[0]
+
+# handle white people
+train = data[(data['race'] == '1') & (data['group'] == 'train')]
+test = data[(data['race'] == '1') & (data['group'] == 'test')]
+    
+clf = CategoricalNB()
+clf.fit(train.drop(columns=['race', 'income', 'group', 'nnb_res']), train['income'])
+    
+res = clf.predict(test.drop(columns=['race', 'income', 'group', 'nnb_res'])).tolist()
+    
+res_index = 0
+test_indeces = np.where((data['race'] == '1') & (data['group'] == 'test'))[0].tolist()
+for test_index in test_indeces:
+   results[test_index] = res[res_index]
+   res_index += 1
+
+# handle non white people
+train = data[(data['race'] != '1') & (data['group'] == 'train')]
+test = data[(data['race'] != '1') & (data['group'] == 'test')]
+    
+clf = CategoricalNB()
+clf.fit(train.drop(columns=['race', 'income', 'group', 'nnb_res']), train['income'])
+    
+res = clf.predict(test.drop(columns=['race', 'income', 'group', 'nnb_res'])).tolist()
+    
+res_index = 0
+test_indeces = np.where((data['race'] != '1') & (data['group'] == 'test'))[0].tolist()
+for test_index in test_indeces:
+   results[test_index] = res[res_index]
+   res_index += 1
+
+data['2nb_res'] = results
+
+# In[]:
+
+# basic accuracy counts
+
+print(data[data['nnb_res'] == data['2nb_res']].shape)
+print(data[data['nnb_res'] == data['income']].shape)
+print(data[data['income'] == data['2nb_res']].shape)
+
+# In[]:
+print(data.columns)
+
+# In[]:
+
+tested = data[data["group"] == "test"][['race', 'income', 'nnb_res', '2nb_res']]
+tested = tested.values.tolist()
+
+with open("results.csv", "w") as fo:
+    writer = csv.writer(fo)
+    writer.writerow(['race', 'income', 'nnb_res', '2nb_res'])
+    
+    for row in tested:
+        writer.writerow(row)
